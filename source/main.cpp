@@ -5,36 +5,47 @@
 #include "../include/SDL2/SDL.h"
 #include "../headers/window.hpp"
 #include "../headers/input.hpp"
-#include "../headers/point.hpp"
 #include "../headers/room.hpp"
 
 int main(int argc, char* argv[]) {
+    const int targetFps = 60;  // SDL auto caps at 60
+    const int ticksPerFrame = 1000 / targetFps;  // a tick is a ms
     Window window = Window();
-
-    bool run = true;
-    // while (run) {
-    //     Input::readEvents();  // ensures events are updated globally every frame, need only be called here
-    //     std::unordered_map<SDL_Keycode, bool> press = Input::getPressed();
-    //     run = !Input::isQuit() && !press[SDLK_COMMA];
-
-    //     sdl.clear();
-    //     sdl.renderRect(0, 0, 50, 50, 255, 255, 255, 255);
-    //     sdl.presentRender();
-    // }
 
     Room firstRoom = Room(20, 20);
     Room* currentRoom = &firstRoom;
     (*currentRoom).draw(window);
-    run = true;
+
+    Uint64 frameTimer = SDL_GetTicks64();
+    //double dt = 1.0;
+    bool run = true;
     while (run) {
+        // get delta time
+        //dt = (double) (SDL_GetTicks64() - frameTimer) * targetFps / 1000;
+        frameTimer = SDL_GetTicks64();
+
+        // read input once to be accessed by any system
         Input::readEvents();
         std::unordered_map<SDL_Keycode, bool> press = Input::getPressed();
         run = !Input::isQuit() && !press[SDLK_COMMA];
 
-        window.clear();
+        // update
         currentRoom = (*currentRoom).update();
+
+        // render
+        window.clear();
         (*currentRoom).draw(window);
         window.presentRender();
+
+        // delay to cap frame rate
+        Uint64 frameTime = SDL_GetTicks64() - frameTimer;
+        if (frameTime < ticksPerFrame) {
+             SDL_Delay(ticksPerFrame - frameTime);
+        }
+
+        // display fps in terminal :)
+        // frameTime = SDL_GetTicks64() - frameTimer;
+        // std::cout << (double) 1000 / frameTime << '\n';
     }
 
     window.close();

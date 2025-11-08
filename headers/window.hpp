@@ -58,8 +58,7 @@ class Window {
 
             // create renderer
             if (!failure) {
-                Uint32 renderFlags = SDL_RENDERER_ACCELERATED;
-                renderer = SDL_CreateRenderer(window, -1, renderFlags);
+                renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
                 if (!renderer) {
                     std::cerr << "Error creating SDL renderer.\n";
                     failure = true;
@@ -101,11 +100,6 @@ class Window {
             SDL_RenderPresent(renderer);
         }
 
-// MARK: -- UTILS ---------------------------------------------------------------------
-
-        void pause(const int& seconds) {
-            SDL_Delay(seconds);
-        }
     private:
         SDL_Window* window = NULL;
         SDL_Renderer* renderer = NULL;

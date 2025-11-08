@@ -1,9 +1,9 @@
 #pragma once
 
 #include <iostream>
-#include "point.hpp"
+#include "point2D.hpp"
 
-class Player : public Point {
+class Player : public Point2D {
     public:
 
         void input() {

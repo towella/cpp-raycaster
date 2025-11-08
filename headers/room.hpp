@@ -10,7 +10,7 @@
 #include "random.hpp"
 #include "utilities.hpp"
 #include "window.hpp"
-#include "point.hpp"
+#include "point2D.hpp"
 #include "input.hpp"
 #include "player.hpp"
 
@@ -52,49 +52,43 @@ class Room {
         }
 
         Room* update() {
-            std::unordered_map<SDL_Keycode, bool> keys = Input::getKeydowns();
-            bool updated = false;
+            std::unordered_map<SDL_Keycode, bool> keysPressed = Input::getPressed();
+            std::unordered_map<SDL_Keycode, bool> keydowns = Input::getKeydowns();
 
             // -- input --
-            Point movedPlayer = Point(player);
-            if (keys[SDLK_w] || keys[SDLK_UP]) {
-                movedPlayer = movedPlayer + Point(0, -1);
-                updated = true;
-            } else if (keys[SDLK_a] || keys[SDLK_LEFT]) {
-                movedPlayer = movedPlayer + Point(-1, 0);
-                updated = true;
-            } else if (keys[SDLK_s] || keys[SDLK_DOWN]) {
-                movedPlayer = movedPlayer + Point(0, 1);
-                updated = true;
-            } else if (keys[SDLK_d] || keys[SDLK_RIGHT]) {
-                movedPlayer = movedPlayer + Point(1, 0);
-                updated = true;
+            int playerSpeed = 5;
+            Point2D movedPlayer = Point2D(player);
+            if (keysPressed[SDLK_w] || keysPressed[SDLK_UP]) {
+                movedPlayer = movedPlayer + Point2D(0, -playerSpeed);
+            } else if (keysPressed[SDLK_a] || keysPressed[SDLK_LEFT]) {
+                movedPlayer = movedPlayer + Point2D(-playerSpeed, 0);
+            } else if (keysPressed[SDLK_s] || keysPressed[SDLK_DOWN]) {
+                movedPlayer = movedPlayer + Point2D(0, playerSpeed);
+            } else if (keysPressed[SDLK_d] || keysPressed[SDLK_RIGHT]) {
+                movedPlayer = movedPlayer + Point2D(playerSpeed, 0);
             }
 
-            if (keys[SDLK_1]) {
+            if (keydowns[SDLK_1]) {
                 drawMode2D = !drawMode2D;
             }
 
             // -- update --
-            if (pointInRoom(movedPlayer) && map[movedPlayer.y][movedPlayer.x] == EMPTY) {
+            Point2D mapNormalisedPlayer((int) movedPlayer.x / wallSize, (int) movedPlayer.y / wallSize);
+            if (pointInRoom(mapNormalisedPlayer) && map[mapNormalisedPlayer.y][mapNormalisedPlayer.x] == EMPTY) {
                 player.set(movedPlayer);
             }
 
-            if (updated) {
-                drawText();
-
-                // if a player is on an exit, enter new room
-                // get pointer to neighbour room corresponding to exit and add new room if required
-                std::unordered_map<char, char> exitEntranceWallMap = {{'l', 'r'}, {'r', 'l'}, {'t', 'b'}, {'b', 't'}}; // exit: entrance
-                int exitIndex;
-                if ((exitIndex = getValueIndex(exits, (Point) player)) >= 0) {
-                    // add new room if none already associated with exit
-                    if (exitRoomsMap[exitIndex] == NULL) {
-                        char newRoomEntranceWall = exitEntranceWallMap[exitWallMap[exits[exitIndex]]];
-                        exitRoomsMap[exitIndex] = new Room(maxWidth, maxHeight, newRoomEntranceWall, this);
-                    }
-                    return exitRoomsMap[exitIndex];
+            // if a player is on an exit, enter new room
+            // get pointer to neighbour room corresponding to exit and add new room if required
+            std::unordered_map<char, char> exitEntranceWallMap = {{'l', 'r'}, {'r', 'l'}, {'t', 'b'}, {'b', 't'}}; // exit: entrance
+            int exitIndex;
+            if ((exitIndex = getValueIndex(exits, mapNormalisedPlayer)) >= 0) {
+                // add new room if none already associated with exit
+                if (exitRoomsMap[exitIndex] == NULL) {
+                    char newRoomEntranceWall = exitEntranceWallMap[exitWallMap[exits[exitIndex]]];
+                    exitRoomsMap[exitIndex] = new Room(maxWidth, maxHeight, newRoomEntranceWall, this);
                 }
+                return exitRoomsMap[exitIndex];
             }
 
             return this;
@@ -108,43 +102,21 @@ class Room {
             }
         }
 
-        void drawText() {
-            clear();
-            std::cout << "draw\n";
-            for (int y = 0; y < map.size(); y++) {
-                for (int x = 0; x < map[y].size(); x++) {
-                    Point p = Point(x, y);
-                    if (p == player) {
-                        std::cout << PLAYER;
-                    } else {
-                        std::cout << map[y][x];
-                    }
-
-                    std::cout << ' ';
-                }
-                std::cout << '\n';
-            }
-        }
-
         void draw2D(Window& window) {
-            int tileWidth = window.screenWidth / map[0].size();
-            if (tileWidth * map.size() > window.screenHeight) {
-                tileWidth = window.screenHeight / map.size();
-            }
-
-            SDL_Rect tile = {0, 0, tileWidth, tileWidth};
+            SDL_Rect tile = {0, 0, wallSize, wallSize};
             for (int y = 0; y < map.size(); y++) {
-                tile.y = y * tileWidth;
+                tile.y = y * wallSize;
                 for (int x = 0; x < map[y].size(); x++) {
-                    tile.x = x * tileWidth;
-                    Point p = Point(x, y);
-                    if (p == player) {
-                        window.renderRect(tile, Colours::red);
-                    } else if (map[y][x] == WALL) {
+                    tile.x = x * wallSize;
+                    if (map[y][x] == WALL) {
                         window.renderRect(tile, Colours::grey);
                     }
                 }
             }
+
+            SDL_Rect playerPoint = {(int) player.x, (int) player.y, 5, 5};
+            window.renderRect(playerPoint, Colours::red);
+            
         }
 
         void draw3D(Window& window) {
@@ -159,35 +131,36 @@ class Room {
         int maxHeight;
         int width;
         int height;
+        int wallSize = 50;  // size of wall in pixels
 
         bool hasPrevRoom = false;  // used for destructor to prevent freeing parent room
 
         // need to store rooms so they arent freed once update stackframe pops
-        std::vector<Point> exits;
+        std::vector<Point2D> exits;
         std::vector<std::vector<char>> map;
         std::unordered_map<int, Room*> exitRoomsMap;  // exit index: room pointer
-        std::unordered_map<Point, char, PointHasher> exitWallMap;  // exit: wall tblr
+        std::unordered_map<Point2D, char, PointHasher> exitWallMap;  // exit: wall tblr
         Player player;
 
-        bool pointInRoom(const Point& p) {
+        bool pointInRoom(const Point2D& p) {
             return p.x >= 0 && p.y >= 0 && p.x < width && p.y < height;
         }
 
-        Point randomPointOnWall(const char& wall) {
+        Point2D randomPointOnWall(const char& wall) {
             // exclude corners
             int randomHeight = random.between(1, height - 1);
             int randomWidth = random.between(1, width - 1);
 
             if (wall == 'l') {
-                return Point(0, randomHeight);
+                return Point2D(0, randomHeight);
             } else if (wall == 'r') {
-                return Point(width - 1, randomHeight);
+                return Point2D(width - 1, randomHeight);
             } else if (wall == 't') {
-                return Point(randomWidth, 0);
+                return Point2D(randomWidth, 0);
             } else if (wall == 'b') {
-                return Point(randomWidth, height - 1);
+                return Point2D(randomWidth, height - 1);
             } else {
-                return Point();
+                return Point2D();
             }
         }
 
@@ -204,6 +177,8 @@ class Room {
             do {
                 generateRoom(entranceWall);
             } while (!roomTraversable());
+            // convert from grid coord space to window coord space
+            player.set(player.x * wallSize, player.y * wallSize);
         }
 
         // generate a random, potentially invalid room layout
@@ -230,7 +205,7 @@ class Room {
             // -- fill in holes --
             for (int y = 0; y < height; y++) {
                 for (int x = 0; x < height; x++) {
-                    Point p = Point(x, y);
+                    Point2D p = Point2D(x, y);
                     int wallNeighbours = 0;
                     for (auto n : p.getCardinalNeighbours()) {
                         if (pointInRoom(n) && map[n.y][n.x] == WALL) {
@@ -244,10 +219,12 @@ class Room {
             }
 
             // -- generate entrance and set player spawn --
+            // player is generated in map coordinate space for generation
+            // then will later be converted to screen pixel coordinate space
             if (entranceWall == 'n') {
-                player.set(Point(1, 1));
+                player.set(Point2D(1, 1));
             } else {
-                Point entrance = randomPointOnWall(entranceWall);
+                Point2D entrance = randomPointOnWall(entranceWall);
                 player.set(entrance);
                 exits.push_back(entrance);
                 exitWallMap[entrance] = entranceWall;
@@ -266,7 +243,7 @@ class Room {
                 int exitTypeIndex = random.random(exitDirections.size());
                 char wall = exitDirections[exitTypeIndex];
                 popAllOfValue(exitDirections, wall);  // remove to avoid duplicates
-                Point exitPoint = randomPointOnWall(wall);
+                Point2D exitPoint = randomPointOnWall(wall);
                 map[exitPoint.y][exitPoint.x] = EMPTY;  // update map
                 exits.push_back(exitPoint);
                 exitWallMap[exitPoint] = wall;
@@ -275,14 +252,14 @@ class Room {
 
         // verify room layout is traversable with bfs to exits
         bool roomTraversable() {
-            std::queue<Point> visitQueue;
-            std::unordered_map<Point, bool, PointHasher> visited;
+            std::queue<Point2D> visitQueue;
+            std::unordered_map<Point2D, bool, PointHasher> visited;
             int visitedExits = 0;
 
             visitQueue.push(player);
             visited[player] = true;
             while (!visitQueue.empty() && visitedExits != exits.size()) {
-                Point p = visitQueue.front();
+                Point2D p = visitQueue.front();
                 if (contains(exits, p)) {
                     visitedExits++;
                 }
