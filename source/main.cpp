@@ -17,11 +17,11 @@ int main(int argc, char* argv[]) {
     (*currentRoom).draw(window);
 
     Uint64 frameTimer = SDL_GetTicks64();
-    //double dt = 1.0;
+    double dt = 1.0;
     bool run = true;
     while (run) {
         // get delta time
-        //dt = (double) (SDL_GetTicks64() - frameTimer) * targetFps / 1000;
+        dt = (double) (SDL_GetTicks64() - frameTimer) * targetFps / 1000;
         frameTimer = SDL_GetTicks64();
 
         // read input once to be accessed by any system
@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
         run = !Input::isQuit() && !press[SDLK_COMMA];
 
         // update
-        currentRoom = (*currentRoom).update();
+        currentRoom = (*currentRoom).update(dt);
 
         // render
         window.clear();

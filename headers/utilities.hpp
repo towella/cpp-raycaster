@@ -33,3 +33,17 @@ template <typename data>
 void popAllOfValue(std::vector<data>& v, const data& d) {
     v.erase(remove(v.begin(), v.end(), d), v.end());
 }
+
+// MARK: ---- ANGLES ---------------------------------------------------------------------
+
+// brings angle to be between 0 and 2PI
+double wrapRadAngle(double angle) {
+    while (angle <= 0 || angle > 2*M_PI) {
+        if (angle > 2*M_PI) {
+            angle = fmod(angle, 2*M_PI);
+        } else if (angle <= 0) {
+            angle = 2*M_PI + angle;
+        }
+    }
+    return angle;
+}

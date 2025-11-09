@@ -20,6 +20,8 @@
 
 class Room {
     public:
+        const int wallSize = 50;  // size of wall in pixels
+
         Room() {
             maxWidth = 20;
             maxHeight = 20;
@@ -51,35 +53,20 @@ class Room {
             }
         }
 
-        Room* update() {
-            std::unordered_map<SDL_Keycode, bool> keysPressed = Input::getPressed();
-            std::unordered_map<SDL_Keycode, bool> keydowns = Input::getKeydowns();
+        const std::vector<std::vector<char>> getMap() {
+            return map;
+        }
 
+        Room* update(double dt) {
             // -- input --
-            int playerSpeed = 5;
-            Point2D movedPlayer = Point2D(player);
-            if (keysPressed[SDLK_w] || keysPressed[SDLK_UP]) {
-                movedPlayer = movedPlayer + Point2D(0, -playerSpeed);
-            } else if (keysPressed[SDLK_a] || keysPressed[SDLK_LEFT]) {
-                movedPlayer = movedPlayer + Point2D(-playerSpeed, 0);
-            } else if (keysPressed[SDLK_s] || keysPressed[SDLK_DOWN]) {
-                movedPlayer = movedPlayer + Point2D(0, playerSpeed);
-            } else if (keysPressed[SDLK_d] || keysPressed[SDLK_RIGHT]) {
-                movedPlayer = movedPlayer + Point2D(playerSpeed, 0);
-            }
-
-            if (keydowns[SDLK_1]) {
-                drawMode2D = !drawMode2D;
-            }
+            getInput();
 
             // -- update --
-            Point2D mapNormalisedPlayer((int) movedPlayer.x / wallSize, (int) movedPlayer.y / wallSize);
-            if (pointInRoom(mapNormalisedPlayer) && map[mapNormalisedPlayer.y][mapNormalisedPlayer.x] == EMPTY) {
-                player.set(movedPlayer);
-            }
+            player.update(dt, map, wallSize);
 
             // if a player is on an exit, enter new room
             // get pointer to neighbour room corresponding to exit and add new room if required
+            Point2D mapNormalisedPlayer((int) player.x() / wallSize, (int) player.y() / wallSize);
             std::unordered_map<char, char> exitEntranceWallMap = {{'l', 'r'}, {'r', 'l'}, {'t', 'b'}, {'b', 't'}}; // exit: entrance
             int exitIndex;
             if ((exitIndex = getValueIndex(exits, mapNormalisedPlayer)) >= 0) {
@@ -94,6 +81,19 @@ class Room {
             return this;
         }
 
+        // determine whether point that conforms to map grid is in room
+        bool normalisedPointInRoom(const Point2D& p) {
+            return p.x() >= 0 && p.y() >= 0 && p.x() < width && p.y() < height;
+        }
+
+        // determine whether point that does NOT conform to map grid is in room
+        bool pointInRoom(const Point2D& p) {
+            // normalise coords to map grid
+            double x = p.x() / wallSize;
+            double y = p.y() / wallSize;
+            return x >= 0 && y >= 0 && x < width && y < height;
+        }
+
         void draw(Window& window) {
             if (drawMode2D) {
                 draw2D(window);
@@ -102,36 +102,15 @@ class Room {
             }
         }
 
-        void draw2D(Window& window) {
-            SDL_Rect tile = {0, 0, wallSize, wallSize};
-            for (int y = 0; y < map.size(); y++) {
-                tile.y = y * wallSize;
-                for (int x = 0; x < map[y].size(); x++) {
-                    tile.x = x * wallSize;
-                    if (map[y][x] == WALL) {
-                        window.renderRect(tile, Colours::grey);
-                    }
-                }
-            }
-
-            SDL_Rect playerPoint = {(int) player.x, (int) player.y, 5, 5};
-            window.renderRect(playerPoint, Colours::red);
-            
-        }
-
-        void draw3D(Window& window) {
-
-        }
-
     private:
         Random random;
         static inline bool drawMode2D = true;
+        const int maxDof = 8;
 
         int maxWidth;
         int maxHeight;
         int width;
         int height;
-        int wallSize = 50;  // size of wall in pixels
 
         bool hasPrevRoom = false;  // used for destructor to prevent freeing parent room
 
@@ -141,10 +120,6 @@ class Room {
         std::unordered_map<int, Room*> exitRoomsMap;  // exit index: room pointer
         std::unordered_map<Point2D, char, PointHasher> exitWallMap;  // exit: wall tblr
         Player player;
-
-        bool pointInRoom(const Point2D& p) {
-            return p.x >= 0 && p.y >= 0 && p.x < width && p.y < height;
-        }
 
         Point2D randomPointOnWall(const char& wall) {
             // exclude corners
@@ -178,7 +153,7 @@ class Room {
                 generateRoom(entranceWall);
             } while (!roomTraversable());
             // convert from grid coord space to window coord space
-            player.set(player.x * wallSize, player.y * wallSize);
+            player.set(player.x() * wallSize, player.y() * wallSize);
         }
 
         // generate a random, potentially invalid room layout
@@ -208,12 +183,12 @@ class Room {
                     Point2D p = Point2D(x, y);
                     int wallNeighbours = 0;
                     for (auto n : p.getCardinalNeighbours()) {
-                        if (pointInRoom(n) && map[n.y][n.x] == WALL) {
+                        if (normalisedPointInRoom(n) && map[n.y()][n.x()] == WALL) {
                             wallNeighbours++;
                         }
                     }
                     if (wallNeighbours >= 3) {
-                        map[p.y][p.x] = WALL;
+                        map[p.y()][p.x()] = WALL;
                     }
                 }
             }
@@ -222,14 +197,14 @@ class Room {
             // player is generated in map coordinate space for generation
             // then will later be converted to screen pixel coordinate space
             if (entranceWall == 'n') {
-                player.set(Point2D(1, 1));
+                player.set(1, 1);
             } else {
                 Point2D entrance = randomPointOnWall(entranceWall);
                 player.set(entrance);
                 exits.push_back(entrance);
                 exitWallMap[entrance] = entranceWall;
             }
-            map[player.y][player.x] = EMPTY;
+            map[player.y()][player.x()] = EMPTY;
 
             // -- generate exits --
             int numExits = random.random(3) + 1;  // must be at least one exit
@@ -244,7 +219,7 @@ class Room {
                 char wall = exitDirections[exitTypeIndex];
                 popAllOfValue(exitDirections, wall);  // remove to avoid duplicates
                 Point2D exitPoint = randomPointOnWall(wall);
-                map[exitPoint.y][exitPoint.x] = EMPTY;  // update map
+                map[exitPoint.y()][exitPoint.x()] = EMPTY;  // update map
                 exits.push_back(exitPoint);
                 exitWallMap[exitPoint] = wall;
             }
@@ -265,7 +240,7 @@ class Room {
                 }
 
                 for (auto n : p.getCardinalNeighbours()) {
-                    if (pointInRoom(n) && map[n.y][n.x] == EMPTY && !visited[n]) {
+                    if (normalisedPointInRoom(n) && map[n.y()][n.x()] == EMPTY && !visited[n]) {
                         visitQueue.push(n);
                         visited[n] = true;
                     }
@@ -278,5 +253,166 @@ class Room {
                 return true;
             }
             return false;
+        }
+    
+        void getInput() {
+            std::unordered_map<SDL_Keycode, bool> keydowns = Input::getKeydowns();
+
+            if (keydowns[SDLK_1]) {
+                drawMode2D = !drawMode2D;
+            }
+        }
+        
+        // https://www.youtube.com/watch?v=gYRrGTC7GtA
+        std::pair<Point2D, double> rayCast(double rayAngleRad, Point2D origin) {
+            // DDA (Digital Differential Analysis)
+            // - find offsets
+            // - loop through dof using offsets to check intersections with hori or vert grid lines
+            // - complete for both axis
+            // - use the shorter ray of the two (collided earlier)
+
+            int mapX, mapY;  // ray hit point coordinates normalised to map coords
+            double rayX, rayY;  // hitting point of the ray
+            double xOffset, yOffset;  // offset to jump to next vert or hori grid line (same every jump)
+            double horiX, horiY;  // cache hori ray hit point while computing vert
+
+            double vertRayDist, horiRayDist;  // store length of both rays for comparison
+            double infiniteDist = wallSize * maxDof + 1;  // largest distance possible in dof + 1
+
+            double negTan = -tan(rayAngleRad);
+            double atan = -1 / tan(rayAngleRad);
+
+            // -- horizontal grid lines check --
+            int dof = 0;
+            // looking up
+            if (rayAngleRad > M_PI/2 && rayAngleRad < 3*M_PI/2) {
+                rayY = (((int) origin.y()) / wallSize) * wallSize - 0.0000001;  // snap y to grid (account for float math error)
+                rayX = (origin.y() - rayY) * negTan + origin.x();
+                yOffset = -wallSize;
+                xOffset = -yOffset * negTan;
+            // looking down
+            } else if (rayAngleRad > 3*M_PI/2 || rayAngleRad < M_PI/2) {
+                rayY = (((int) origin.y()) / wallSize) * wallSize + wallSize;  // snap y to grid
+                rayX = (origin.y() - rayY) * negTan + origin.x();
+                yOffset = wallSize;
+                xOffset = -yOffset * negTan;
+            // looking straight right or left, skip and use other ray
+            } else {
+                dof = maxDof;
+                horiRayDist = infiniteDist;
+            }
+            while (dof < maxDof) {
+                mapX = (int) rayX / wallSize;
+                mapY = (int) rayY / wallSize;
+                // has hit
+                if (normalisedPointInRoom(Point2D(mapX, mapY)) && map[mapY][mapX] == WALL) {
+                    horiRayDist = origin.getDistance(Point2D(rayX, rayY));
+                    break;
+                // check next horizontal grid line
+                } else {
+                    dof++;
+                    if (dof >= maxDof) {horiRayDist = infiniteDist;}  // has not hit within dof so set dist to max
+                    else {
+                        rayX += xOffset;
+                        rayY += yOffset;
+                    }
+                }
+            }
+            horiX = rayX;
+            horiY = rayY;
+
+            // -- vertical grid lines check --
+            dof = 0;
+            // looking left
+            if (rayAngleRad > M_PI) {
+                rayX = (((int) origin.x()) / wallSize) * wallSize - 0.0000001;  // snap y to grid (account for float math error)
+                rayY = (origin.x() - rayX) * atan + origin.y();
+                xOffset = -wallSize;
+                yOffset = -xOffset * atan;
+            // looking right
+            } else if (rayAngleRad < M_PI && rayAngleRad != 0) {
+                rayX = (((int) origin.x()) / wallSize) * wallSize + wallSize;  // snap y to grid
+                rayY = (origin.x() - rayX) * atan + origin.y();
+                xOffset = wallSize;
+                yOffset = -xOffset * atan;
+            // looking straight up or down, skip and use other ray
+            } else {
+                dof = maxDof;
+                vertRayDist = infiniteDist;
+            }
+            while (dof < maxDof) {
+                mapX = (int) rayX / wallSize;
+                mapY = (int) rayY / wallSize;
+                // has hit
+                if (normalisedPointInRoom(Point2D(mapX, mapY)) && map[mapY][mapX] == WALL) {
+                    vertRayDist = origin.getDistance(Point2D(rayX, rayY));
+                    break;
+                // check next horizontal grid line
+                } else {
+                    dof++;
+                    if (dof >= maxDof) {vertRayDist = infiniteDist;} // has not hit within dof so set dist to max
+                    else {
+                        rayX += xOffset;
+                        rayY += yOffset;
+                    }
+                }
+            }
+
+            // return shorter ray (collided with wall earlier)
+            if (horiRayDist < vertRayDist) {
+                return std::pair(Point2D(horiX, horiY), horiRayDist);
+            } else {
+                return std::pair(Point2D(rayX, rayY), vertRayDist);
+            }
+        }
+
+        void draw2D(Window& window) {
+            SDL_Rect tile = {0, 0, wallSize, wallSize};
+            for (int y = 0; y < map.size(); y++) {
+                tile.y = y * wallSize;
+                for (int x = 0; x < map[y].size(); x++) {
+                    tile.x = x * wallSize;
+                    if (map[y][x] == WALL) {
+                        window.renderRect(tile, Colours::grey);
+                    }
+                }
+            }
+
+            player.draw2D(window);
+            
+            // debug raycasts
+            double fovRad = player.getFovRad();
+            for (double r = fovRad/2; r > -fovRad/2; r = r - M_PI/180) {
+                double angle = wrapRadAngle(player.getRotRad() + r);
+                window.renderLine(player, rayCast(angle, player).first, Colours::magenta);
+            }
+        }
+
+        void draw3D(Window& window) {
+            int x = 0;  // increment accross screen
+            int w = 1;  // one slice every pixel
+            int y, h;
+
+            double fovRad = player.getFovRad();
+            for (double r = fovRad/2; r > -fovRad/2; r = r - fovRad/window.screenWidth) {
+                double angle = wrapRadAngle(player.getRotRad() + r);
+                double rayLength = rayCast(angle, player).second;
+                
+                h = wallSize * window.screenHeight / rayLength;
+                y = (window.screenHeight - h) / 2;
+                SDL_Rect slice = {x, y, w, h};
+
+                int value = (int) (255 * window.screenHeight / rayLength / wallSize);
+                if (value > 200) {
+                    value = 200;
+                }
+                if (rayLength >= wallSize * maxDof) {
+                    value = 0;
+                }
+                Colour colour = {value, value, value, value};
+                
+                window.renderRect(slice, colour);
+                x++;
+            }
         }
 };

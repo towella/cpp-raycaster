@@ -6,31 +6,36 @@
 
 class Point2D {
     public:
-        double x;
-        double y;
-
         Point2D() {
-            x = 0;
-            y = 0;
+            _x = 0;
+            _y = 0;
         }
 
         Point2D(int pX, int pY) {
-            x = (double) pX;
-            y = (double) pY;
+            _x = (double) pX;
+            _y = (double) pY;
         }
 
         Point2D(double pX, double pY) {
-            x = pX;
-            y = pY;
+            _x = pX;
+            _y = pY;
         }
 
         Point2D(const Point2D& p) {
-            x = p.x;
-            y = p.y;
+            _x = p._x;
+            _y = p._y;
+        }
+
+        const double x() const {
+            return _x;
+        }
+
+        const double y() const {
+            return _y;
         }
 
         bool operator==(const Point2D& p) {
-            return x == p.x && y == p.y;
+            return _x == p._x && _y == p._y;
         }
 
         bool operator!=(const Point2D& p) {
@@ -38,26 +43,24 @@ class Point2D {
         }
 
         Point2D operator+(const Point2D& p) {
-            return Point2D(x + p.x, y + p.y);
+            return Point2D(_x + p._x, _y + p._y);
         }
 
         Point2D operator-(const Point2D& p) {
-            return Point2D(x - p.x, y - p.y);
-        }
-
-        void set(int pX, int pY) {
-            x = (double) pX;
-            y = (double) pY;
+            return Point2D(_x - p._x, _y - p._y);
         }
 
         void set(double pX, double pY) {
-            x = pX;
-            y = pY;
+            _x = pX;
+            _y = pY;
+        }
+
+        void set(int pX, int pY) {
+            set((double) pX, (double) pY);
         }
 
         void set(const Point2D& p) {
-            x = p.x;
-            y = p.y;
+            set(p._x, p._y);
         }
 
         std::vector<Point2D> getCardinalNeighbours() {
@@ -86,6 +89,26 @@ class Point2D {
             return cardinalNeighbours;
         }
 
+        double getDistance(const Point2D& p) {
+            return abs(sqrt((p._x - _x)*(p._x - _x) + (p._y - _y)*(p._y - _y)));
+        }
+
+        // 0 is down, inc anti-clockwise
+        Point2D rotateRad(const Point2D& origin, double rad) {
+            set(*this - origin);  // relative coords
+            // rotate
+            double cosRot = cos(rad);
+            double sinRot = sin(rad);
+            set(_x * cosRot + _y * sinRot,
+                _y * cosRot - _x * sinRot);
+            set(*this + origin);  // back to normal coords
+            return *this;
+        }
+
+    protected:
+        double _x;
+        double _y;
+
     private:
 };
 
@@ -93,11 +116,11 @@ class Point2D {
 // need binary operator overloads outside of class as well??
 // https://stackoverflow.com/questions/2828280/friend-functions-and-operator-overloading-what-is-the-proper-way-to-overlo
 bool operator==(const Point2D& p1, const Point2D& p2) {
-    return p1.x == p2.x && p1.y == p2.y;
+    return p1.x() == p2.x() && p1.y() == p2.y();
 }
 
 bool operator!=(const Point2D& p1, const Point2D& p2) {
-    return p1.x != p2.x || p1.y != p2.y;
+    return p1.x() != p2.x() || p1.y() != p2.y();
 }
 
 
@@ -105,6 +128,6 @@ bool operator!=(const Point2D& p1, const Point2D& p2) {
 class PointHasher {
     public:
         size_t operator()(const Point2D& p) const {
-            return std::hash<double>()(p.x) ^ (std::hash<double>()(p.y) << 1);
+            return std::hash<double>()(p.x()) ^ (std::hash<double>()(p.y()) << 1);
         }
 };
