@@ -10,7 +10,8 @@
 #include "random.hpp"
 #include "utilities.hpp"
 #include "window.hpp"
-#include "point2D.hpp"
+#include "ray.hpp"
+#include "point.hpp"
 #include "input.hpp"
 #include "player.hpp"
 
@@ -262,109 +263,6 @@ class Room {
                 drawMode2D = !drawMode2D;
             }
         }
-        
-        // https://www.youtube.com/watch?v=gYRrGTC7GtA
-        std::pair<Point2D, double> rayCast(double rayAngleRad, Point2D origin) {
-            // DDA (Digital Differential Analysis)
-            // - find offsets
-            // - loop through dof using offsets to check intersections with hori or vert grid lines
-            // - complete for both axis
-            // - use the shorter ray of the two (collided earlier)
-
-            int mapX, mapY;  // ray hit point coordinates normalised to map coords
-            double rayX, rayY;  // hitting point of the ray
-            double xOffset, yOffset;  // offset to jump to next vert or hori grid line (same every jump)
-            double horiX, horiY;  // cache hori ray hit point while computing vert
-
-            double vertRayDist, horiRayDist;  // store length of both rays for comparison
-            double infiniteDist = wallSize * maxDof + 1;  // largest distance possible in dof + 1
-
-            double negTan = -tan(rayAngleRad);
-            double atan = -1 / tan(rayAngleRad);
-
-            // -- horizontal grid lines check --
-            int dof = 0;
-            // looking up
-            if (rayAngleRad > M_PI/2 && rayAngleRad < 3*M_PI/2) {
-                rayY = (((int) origin.y()) / wallSize) * wallSize - 0.0000001;  // snap y to grid (account for float math error)
-                rayX = (origin.y() - rayY) * negTan + origin.x();
-                yOffset = -wallSize;
-                xOffset = -yOffset * negTan;
-            // looking down
-            } else if (rayAngleRad > 3*M_PI/2 || rayAngleRad < M_PI/2) {
-                rayY = (((int) origin.y()) / wallSize) * wallSize + wallSize;  // snap y to grid
-                rayX = (origin.y() - rayY) * negTan + origin.x();
-                yOffset = wallSize;
-                xOffset = -yOffset * negTan;
-            // looking straight right or left, skip and use other ray
-            } else {
-                dof = maxDof;
-                horiRayDist = infiniteDist;
-            }
-            while (dof < maxDof) {
-                mapX = (int) rayX / wallSize;
-                mapY = (int) rayY / wallSize;
-                // has hit
-                if (normalisedPointInRoom(Point2D(mapX, mapY)) && map[mapY][mapX] == WALL) {
-                    horiRayDist = origin.getDistance(Point2D(rayX, rayY));
-                    break;
-                // check next horizontal grid line
-                } else {
-                    dof++;
-                    if (dof >= maxDof) {horiRayDist = infiniteDist;}  // has not hit within dof so set dist to max
-                    else {
-                        rayX += xOffset;
-                        rayY += yOffset;
-                    }
-                }
-            }
-            horiX = rayX;
-            horiY = rayY;
-
-            // -- vertical grid lines check --
-            dof = 0;
-            // looking left
-            if (rayAngleRad > M_PI) {
-                rayX = (((int) origin.x()) / wallSize) * wallSize - 0.0000001;  // snap y to grid (account for float math error)
-                rayY = (origin.x() - rayX) * atan + origin.y();
-                xOffset = -wallSize;
-                yOffset = -xOffset * atan;
-            // looking right
-            } else if (rayAngleRad < M_PI && rayAngleRad != 0) {
-                rayX = (((int) origin.x()) / wallSize) * wallSize + wallSize;  // snap y to grid
-                rayY = (origin.x() - rayX) * atan + origin.y();
-                xOffset = wallSize;
-                yOffset = -xOffset * atan;
-            // looking straight up or down, skip and use other ray
-            } else {
-                dof = maxDof;
-                vertRayDist = infiniteDist;
-            }
-            while (dof < maxDof) {
-                mapX = (int) rayX / wallSize;
-                mapY = (int) rayY / wallSize;
-                // has hit
-                if (normalisedPointInRoom(Point2D(mapX, mapY)) && map[mapY][mapX] == WALL) {
-                    vertRayDist = origin.getDistance(Point2D(rayX, rayY));
-                    break;
-                // check next horizontal grid line
-                } else {
-                    dof++;
-                    if (dof >= maxDof) {vertRayDist = infiniteDist;} // has not hit within dof so set dist to max
-                    else {
-                        rayX += xOffset;
-                        rayY += yOffset;
-                    }
-                }
-            }
-
-            // return shorter ray (collided with wall earlier)
-            if (horiRayDist < vertRayDist) {
-                return std::pair(Point2D(horiX, horiY), horiRayDist);
-            } else {
-                return std::pair(Point2D(rayX, rayY), vertRayDist);
-            }
-        }
 
         void draw2D(Window& window) {
             SDL_Rect tile = {0, 0, wallSize, wallSize};
@@ -382,9 +280,14 @@ class Room {
             
             // debug raycasts
             double fovRad = player.getFovRad();
-            for (double r = fovRad/2; r > -fovRad/2; r = r - M_PI/180) {
-                double angle = wrapRadAngle(player.getRotRad() + r);
-                window.renderLine(player, rayCast(angle, player).first, Colours::magenta);
+            for (double r = fovRad/2; r > -fovRad/2; r = r - fovRad/window.screenWidth) {
+                double angle = player.getRotRad() + r;
+                Ray2D ray = Ray2D(player, angle, maxDof, wallSize, map);
+                if (ray.getHit()) {
+                    window.renderLine(player, ray.getHitPos(), Colours::magenta);
+                } else {
+                    window.renderLine(player, ray.getHitPos(), Colours::yellow);
+                }
             }
         }
 
@@ -395,23 +298,28 @@ class Room {
 
             double fovRad = player.getFovRad();
             for (double r = fovRad/2; r > -fovRad/2; r = r - fovRad/window.screenWidth) {
-                double angle = wrapRadAngle(player.getRotRad() + r);
-                double rayLength = rayCast(angle, player).second;
+                double rayAngle = player.getRotRad() + r;
+                Ray2D ray = Ray2D(player, rayAngle, maxDof, wallSize, map);
+                double rayLength = ray.getLength();
+
+                // correct fisheye
+                double angleDifference = wrapRadAngle(player.getRotRad() - rayAngle);
+                rayLength *= cos(angleDifference);
                 
                 h = wallSize * window.screenHeight / rayLength;
                 y = (window.screenHeight - h) / 2;
                 SDL_Rect slice = {x, y, w, h};
-
                 int value = (int) (255 * window.screenHeight / rayLength / wallSize);
-                if (value > 200) {
-                    value = 200;
-                }
-                if (rayLength >= wallSize * maxDof) {
-                    value = 0;
-                }
+                // value adjustments and capping
+                value += 30;
+                if (value > 200) { value = 200; }
+                if (ray.getHitAxis() == RayHitAxis::horizontal) { value -= 20; }
+                if (value < 0) { value = 0; }
                 Colour colour = {value, value, value, value};
-                
-                window.renderRect(slice, colour);
+
+                if (ray.getHit()) {
+                    window.renderRect(slice, colour);
+                }
                 x++;
             }
         }

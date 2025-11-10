@@ -2,7 +2,7 @@
 
 #include <iostream>
 #include "../include/SDL2/SDL.h"
-#include "../headers/point2D.hpp"
+#include "point.hpp"
 
 struct Colour {
     int r = 255;

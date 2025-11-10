@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "window.hpp"
-#include "point2D.hpp"
+#include "point.hpp"
 
 #define EMPTY '.'
 
@@ -129,13 +129,13 @@ class Player : public Point2D {
                 moveOffset = Point2D(sin(rotRad) * framePlayerSpeed, cos(rotRad) * framePlayerSpeed);
             }
             if (keysPressed[SDLK_a]) {
-                moveOffset = Point2D(sin(rotRad + M_PI/2) * framePlayerSpeed, cos(rotRad + M_PI/2) * framePlayerSpeed);
+                moveOffset = moveOffset + Point2D(sin(rotRad + M_PI/2) * framePlayerSpeed, cos(rotRad + M_PI/2) * framePlayerSpeed);
             }
             if (keysPressed[SDLK_s]) {
-                moveOffset = Point2D(sin(rotRad + M_PI) * framePlayerSpeed, cos(rotRad + M_PI) * framePlayerSpeed);
+                moveOffset = moveOffset + Point2D(sin(rotRad + M_PI) * framePlayerSpeed, cos(rotRad + M_PI) * framePlayerSpeed);
             }
             if (keysPressed[SDLK_d]) {
-                moveOffset = Point2D(sin(rotRad - M_PI/2) * framePlayerSpeed, cos(rotRad - M_PI/2) * framePlayerSpeed);
+                moveOffset = moveOffset + Point2D(sin(rotRad - M_PI/2) * framePlayerSpeed, cos(rotRad - M_PI/2) * framePlayerSpeed);
             }
             Point2D movedPlayer = (*this) + moveOffset;
 

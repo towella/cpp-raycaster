@@ -89,8 +89,12 @@ class Point2D {
             return cardinalNeighbours;
         }
 
+        double getDistance(const double x, const double y) {
+            return abs(sqrt((x - _x)*(x - _x) + (y - _y)*(y - _y)));
+        }
+
         double getDistance(const Point2D& p) {
-            return abs(sqrt((p._x - _x)*(p._x - _x) + (p._y - _y)*(p._y - _y)));
+            return getDistance(p._x, p._y);
         }
 
         // 0 is down, inc anti-clockwise
