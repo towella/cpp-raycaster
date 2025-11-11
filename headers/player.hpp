@@ -51,6 +51,10 @@ class Player : public Point2D {
             return (double) cameraPlaneDist / cameraPlaneWidth * 100 * M_PI/180;
         }
 
+        const std::pair<Point2D, Point2D> getCameraPlane() const {
+            return cameraPlane;
+        }
+
         void set(double pX, double pY) {
             Point2D offset(pX - _x, pY - _y);
             _x = pX;

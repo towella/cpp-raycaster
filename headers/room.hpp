@@ -278,34 +278,50 @@ class Room {
 
             player.draw2D(window);
             
+            // find offset for a single slice of camera plane
+            std::pair<Point2D, Point2D> playerCamera = player.getCameraPlane();
+            Point2D cameraCastPoint(playerCamera.first);
+            double lerpIncrement = (double) 1 / window.screenWidth;
+            Point2D lerpOffset = Point2D((playerCamera.second.x() - playerCamera.first.x()) * lerpIncrement,
+                                         (playerCamera.second.y() - playerCamera.first.y()) * lerpIncrement);
             // debug raycasts
-            double fovRad = player.getFovRad();
-            for (double r = fovRad/2; r > -fovRad/2; r = r - fovRad/window.screenWidth) {
-                double angle = player.getRotRad() + r;
-                Ray2D ray = Ray2D(player, angle, maxDof, wallSize, map);
+            for (int x = 0; x < window.screenWidth; x++) {
+                double rayAngle = player.getAngleTo(cameraCastPoint);
+                Ray2D ray = Ray2D(player, rayAngle, maxDof, wallSize, map);
+                window.renderLine(cameraCastPoint, cameraCastPoint, Colours::green);
                 if (ray.getHit()) {
-                    window.renderLine(player, ray.getHitPos(), Colours::magenta);
+                    window.renderLine(cameraCastPoint, ray.getHitPos(), Colours::magenta);
                 } else {
-                    window.renderLine(player, ray.getHitPos(), Colours::yellow);
+                    window.renderLine(cameraCastPoint, ray.getHitPos(), Colours::yellow);
                 }
+                cameraCastPoint = cameraCastPoint + lerpOffset;
             }
         }
 
         void draw3D(Window& window) {
-            int x = 0;  // increment accross screen
-            int w = 1;  // one slice every pixel
+            const int w = 1;  // pixels per slice
             int y, h;
+            
+            // find offset for a single slice of camera plane
+            // prevents outer fisheye by placing rays through camera slices (mapping to screen slices)
+            // rather than even radial increments which don't properly align with screen slices
+            // https://www.scottsmitelli.com/articles/we-can-fix-your-raycaster/
+            std::pair<Point2D, Point2D> playerCamera = player.getCameraPlane();
+            Point2D cameraCastPoint(playerCamera.first);
+            double lerpIncrement = (double) 1 / (window.screenWidth / w);
+            Point2D lerpOffset = Point2D((playerCamera.second.x() - playerCamera.first.x()) * lerpIncrement,
+                                         (playerCamera.second.y() - playerCamera.first.y()) * lerpIncrement);
 
-            double fovRad = player.getFovRad();
-            for (double r = fovRad/2; r > -fovRad/2; r = r - fovRad/window.screenWidth) {
-                double rayAngle = player.getRotRad() + r;
+            for (int x = 0; x < window.screenWidth; x += w) {
+                double rayAngle = player.getAngleTo(cameraCastPoint);
                 Ray2D ray = Ray2D(player, rayAngle, maxDof, wallSize, map);
                 double rayLength = ray.getLength();
 
-                // correct fisheye
+                // allowing for curved viewing surface (prevent aspect of fisheye)
+                // https://stackoverflow.com/questions/66591163/how-do-i-fix-the-warped-perspective-in-my-raycaster
                 double angleDifference = wrapRadAngle(player.getRotRad() - rayAngle);
                 rayLength *= cos(angleDifference);
-                
+
                 h = wallSize * window.screenHeight / rayLength;
                 y = (window.screenHeight - h) / 2;
                 SDL_Rect slice = {x, y, w, h};
@@ -320,7 +336,8 @@ class Room {
                 if (ray.getHit()) {
                     window.renderRect(slice, colour);
                 }
-                x++;
+                
+                cameraCastPoint = cameraCastPoint + lerpOffset;  // move to next slice of camera plane
             }
         }
 };
