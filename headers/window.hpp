@@ -27,8 +27,8 @@ struct Colours {
 
 class Window {
     public:
-        const int screenWidth = 800;
-        const int screenHeight = 600;
+        int screenWidth = 800;
+        int screenHeight = 600;
 
 // MARK: -- SETUP AND SHUTDOWN -------------------------------------------------------
 
@@ -49,7 +49,7 @@ class Window {
                     SDL_WINDOWPOS_CENTERED,  // otherwise provide y coord
                     screenWidth,  // width px
                     screenHeight,  // height px
-                    SDL_WINDOW_SHOWN  // window flags (i.e. SDL_WINDOW_BORDERLESS)
+                    SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE  // window flags (i.e. SDL_WINDOW_BORDERLESS)
                 );
                 if (!window) {
                     std::cerr << "Error creating SDL window.\n";
@@ -59,7 +59,10 @@ class Window {
 
             // create renderer
             if (!failure) {
-                renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+                renderer = SDL_CreateRenderer(
+                    window, 
+                    -1, 
+                    SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
                 if (!renderer) {
                     std::cerr << "Error creating SDL renderer.\n";
                     failure = true;
@@ -68,10 +71,15 @@ class Window {
             }
         }
 
+        SDL_Renderer* getRenderer() const {
+            return renderer;
+        }
+
         void close() {
             // remove in REVERSE order to creation :)
             SDL_DestroyRenderer(renderer);
             SDL_DestroyWindow(window);
+            //IMG_Quit();
             SDL_Quit();
         }
 

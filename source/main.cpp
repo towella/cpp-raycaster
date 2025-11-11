@@ -25,9 +25,9 @@ int main(int argc, char* argv[]) {
         frameTimer = SDL_GetTicks64();
 
         // read input once to be accessed by any system
-        Input::readEvents();
+        Input::readEvents(window);
         std::unordered_map<SDL_Keycode, bool> press = Input::getPressed();
-        run = !Input::isQuit() && !press[SDLK_COMMA];
+        run = !Input::getQuit() && !press[SDLK_COMMA];
 
         // update
         currentRoom = (*currentRoom).update(dt);
