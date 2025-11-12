@@ -3,9 +3,9 @@
 #include <string>
 
 #include "../include/SDL2/SDL.h"
-#include "../headers/window.hpp"
-#include "../headers/input.hpp"
-#include "../headers/room.hpp"
+#include "window.hpp"
+#include "input.hpp"
+#include "room.hpp"
 
 int main(int argc, char* argv[]) {
     const int targetFps = 60;  // SDL auto caps at 60

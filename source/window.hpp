@@ -1,7 +1,9 @@
 #pragma once
 
 #include <iostream>
+#include <vector>
 #include "../include/SDL2/SDL.h"
+#include "../include/SDL2/SDL_image.h"
 #include "point.hpp"
 
 struct Colour {
@@ -33,6 +35,9 @@ class Window {
 // MARK: -- SETUP AND SHUTDOWN -------------------------------------------------------
 
         Window() {
+            // NOTE: Either use the renderer for drawing to the screen and using textures
+            // !OR! use the window screen surface to blit image surfaces. Can't use both!!
+
             bool failure = false;
 
             // 0 indicates success
@@ -69,6 +74,14 @@ class Window {
                 }
                 clear();
             }
+
+            // init sdl_image
+            if (!failure) {
+                if(!IMG_Init(IMG_INIT_PNG)) {
+                    std::cerr << "SDL_image could not initialize! SDL_image Error.\n";
+                    failure = true;
+                }
+            }
         }
 
         SDL_Renderer* getRenderer() const {
@@ -76,16 +89,48 @@ class Window {
         }
 
         void close() {
+            // free all textures
+            for (int i = 0; i < allocatedTextures.size(); i++) {
+                if (allocatedTextures[i] != NULL) {
+                    SDL_DestroyTexture(allocatedTextures[i]);
+                }
+            }
+
+            // free all surfaces
+            for (int i = 0; i < allocatedSurfaces.size(); i++) {
+                if (allocatedSurfaces[i] != NULL) {
+                    SDL_FreeSurface(allocatedSurfaces[i]);
+                }
+            }
+
             // remove in REVERSE order to creation :)
             SDL_DestroyRenderer(renderer);
             SDL_DestroyWindow(window);
-            //IMG_Quit();
+            IMG_Quit();
             SDL_Quit();
         }
 
-// MARK: -- INPUT --------------------------------------------------------------------
+// MARK: -- LOAD MEDIA ---------------------------------------------------------------
 
+        SDL_Texture* loadTexture(std::string& path) {
+            SDL_Texture* newTexture = NULL;
 
+            SDL_Surface* loadedSurface = IMG_Load(path.c_str());
+            if (loadedSurface == NULL) {
+                std::cerr << "Unable to load image: " << path.c_str() << " SDL_image Error.\n";
+            
+            } else {
+                newTexture = SDL_CreateTextureFromSurface(renderer, loadedSurface);
+                if (newTexture == NULL)
+                {
+                    std::cerr << "Unable to create texture of image " << path.c_str() << " SDL_image Error.\n";
+                }
+                SDL_FreeSurface(loadedSurface);
+                allocatedTextures.push_back(newTexture);
+            }
+
+            return newTexture;
+        }
 
 // MARK: -- RENDERING ----------------------------------------------------------------
 
@@ -122,4 +167,6 @@ class Window {
     private:
         SDL_Window* window = NULL;
         SDL_Renderer* renderer = NULL;
+        std::vector<SDL_Texture*> allocatedTextures;
+        std::vector<SDL_Surface*> allocatedSurfaces;
 };
