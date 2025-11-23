@@ -10,11 +10,13 @@
 int main(int argc, char* argv[]) {
     const int targetFps = 60;  // SDL auto caps at 60
     const int ticksPerFrame = 1000 / targetFps;  // a tick is a ms
-    Window window = Window();
+    Window window = Window(RenderMode::softwareRendering);
 
     Room firstRoom = Room(20, 20);
     Room* currentRoom = &firstRoom;
     (*currentRoom).draw(window);
+
+    SDL_Surface* grassImg = window.loadSurface("assets/Grass.png");
 
     Uint64 frameTimer = SDL_GetTicks64();
     double dt = 1.0;
@@ -35,6 +37,8 @@ int main(int argc, char* argv[]) {
         // render
         window.clear();
         (*currentRoom).draw(window);
+        window.renderSurfaceFillScreen(grassImg);
+        window.renderScaledSurface(grassImg, Point2D(50, 30), 4, 0.5);
         window.presentRender();
 
         // delay to cap frame rate
@@ -43,9 +47,10 @@ int main(int argc, char* argv[]) {
              SDL_Delay(ticksPerFrame - frameTime);
         }
 
-        // display fps in terminal :)
-        // frameTime = SDL_GetTicks64() - frameTimer;
-        // std::cout << (double) 1000 / frameTime << '\n';
+        // display fps in window title
+        frameTime = SDL_GetTicks64() - frameTimer;
+        window.setTitle(std::to_string((double) 1000 / frameTime));
+
     }
 
     window.close();

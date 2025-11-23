@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <vector>
+#include <string>
 #include "../include/SDL2/SDL.h"
 #include "../include/SDL2/SDL_image.h"
 #include "point.hpp"
@@ -25,19 +26,27 @@ struct Colours {
     static inline Colour yellow = {255, 255, 0, 255};
     static inline Colour magenta = {255, 0, 255, 255};
     static inline Colour cyan = {0, 255, 255, 255};
+    static inline Colour orange = {255, 132, 0, 255};
+};
+
+enum RenderMode {
+    simpleRenderer,  // just the window renderer using simple shapes
+    softwareRendering,  // uses surfaces and the window surface to blit with the CPU. Does not use renderer at all
+    hardwareRendering,  // uses textures and window renderer to render with the GPU.
 };
 
 class Window {
     public:
         int screenWidth = 800;
         int screenHeight = 600;
+        std::string title = "";
 
 // MARK: -- SETUP AND SHUTDOWN -------------------------------------------------------
 
-        Window() {
+        Window(RenderMode renderMode=RenderMode::simpleRenderer) {
             // NOTE: Either use the renderer for drawing to the screen and using textures
             // !OR! use the window screen surface to blit image surfaces. Can't use both!!
-
+            this->renderMode = renderMode;
             bool failure = false;
 
             // 0 indicates success
@@ -49,7 +58,7 @@ class Window {
             // create window
             if (!failure) {
                 window = SDL_CreateWindow(
-                    "My Title",  // pass NULL for no title (like when using flag SDL_WINDOW_BORDERLESS
+                    NULL,  // pass NULL for no title (like when using flag SDL_WINDOW_BORDERLESS
                     SDL_WINDOWPOS_CENTERED,  // otherwise provide x coord (pos on screen window appears)
                     SDL_WINDOWPOS_CENTERED,  // otherwise provide y coord
                     screenWidth,  // width px
@@ -62,8 +71,17 @@ class Window {
                 }
             }
 
+            // window screen surface for software rendering (surface based)
+            if (!failure && renderMode == RenderMode::softwareRendering) {
+			    screenSurface = SDL_GetWindowSurface(window);
+                if (!screenSurface) {
+                    std::cerr << "Error getting window screen surface.\n";
+                    failure = true;
+                }
+            }
+
             // create renderer
-            if (!failure) {
+            if (!failure && (renderMode == RenderMode::simpleRenderer || renderMode == RenderMode::hardwareRendering)) {
                 renderer = SDL_CreateRenderer(
                     window, 
                     -1, 
@@ -75,17 +93,13 @@ class Window {
                 clear();
             }
 
-            // init sdl_image
-            if (!failure) {
+            // init sdl_image (for texture based hardware rendering)
+            if (!failure && renderMode == RenderMode::hardwareRendering) {
                 if(!IMG_Init(IMG_INIT_PNG)) {
                     std::cerr << "SDL_image could not initialize! SDL_image Error.\n";
                     failure = true;
                 }
             }
-        }
-
-        SDL_Renderer* getRenderer() const {
-            return renderer;
         }
 
         void close() {
@@ -112,18 +126,28 @@ class Window {
 
 // MARK: -- LOAD MEDIA ---------------------------------------------------------------
 
-        SDL_Texture* loadTexture(std::string& path) {
+        // Requires relative path from project root
+        SDL_Surface* loadSurface(std::string path) {
+            SDL_Surface* newSurface = IMG_Load(path.c_str());
+            if (newSurface == NULL) {
+                std::cerr << "Error loading image file at " << path << '\n' << SDL_GetError() << '\n';
+            }
+            return newSurface;
+        }
+
+        // Requires relative path from project root
+        SDL_Texture* loadTexture(std::string path) {
             SDL_Texture* newTexture = NULL;
 
             SDL_Surface* loadedSurface = IMG_Load(path.c_str());
             if (loadedSurface == NULL) {
-                std::cerr << "Unable to load image: " << path.c_str() << " SDL_image Error.\n";
+                std::cerr << "Unable to load image: " << path.c_str() << '\n' << SDL_GetError() << '\n';
             
             } else {
                 newTexture = SDL_CreateTextureFromSurface(renderer, loadedSurface);
                 if (newTexture == NULL)
                 {
-                    std::cerr << "Unable to create texture of image " << path.c_str() << " SDL_image Error.\n";
+                    std::cerr << "Unable to create texture of image " << path << " SDL_image Error.\n";
                 }
                 SDL_FreeSurface(loadedSurface);
                 allocatedTextures.push_back(newTexture);
@@ -138,6 +162,8 @@ class Window {
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
             SDL_RenderClear(renderer);
         }
+
+        // -- Simple Rendering --
 
         void renderRect(int x, int y, int w, int h, int r, int g, int b, int a) {
             SDL_Rect rect = {x, y, w, h};
@@ -160,12 +186,75 @@ class Window {
             SDL_RenderDrawLine(renderer, p1.x(), p1.y(), p2.x(), p2.y());
         }
 
+        // -- Software Rendering --
+
+        void renderSurface(SDL_Surface* pSurface, Point2D topLeft) {
+            SDL_Rect destinationRect = {(int) topLeft.x(), (int) topLeft.y(), pSurface->w, pSurface->h};
+            SDL_BlitSurface(pSurface, NULL, screenSurface, &destinationRect);
+        }
+
+        void renderSurface(SDL_Surface* pSurface) {
+            SDL_BlitSurface(pSurface, NULL, screenSurface, NULL);
+        }
+
+        void renderMaskedSurface(SDL_Surface* pSurface, Point2D topLeft, SDL_Rect sourceMask) {
+            SDL_Rect destinationRect = {(int) topLeft.x(), (int) topLeft.y(), pSurface->w, pSurface->h};
+            SDL_BlitSurface(pSurface, &sourceMask, screenSurface, &destinationRect);
+        }
+
+        void renderScaledSurface(SDL_Surface* pSurface, Point2D topLeft, double scaleX, double scaleY) {
+            SDL_Rect scaleRect = {(int) topLeft.x(), (int) topLeft.y(), (int) (pSurface->w * scaleX), (int) (pSurface->h * scaleY)};
+            SDL_BlitScaled(pSurface, NULL, screenSurface, &scaleRect);
+        }
+
+        void renderScaledSurface(SDL_Surface* pSurface, SDL_Rect scaleAndPositionRect) {
+            SDL_BlitScaled(pSurface, NULL, screenSurface, &scaleAndPositionRect);
+        }
+
+        void renderSurfaceMaskedAndScaled(SDL_Surface* pSurface, SDL_Rect sourceMask, SDL_Rect scaleAndPositionRect) {
+            SDL_BlitScaled(pSurface, &sourceMask, screenSurface, &scaleAndPositionRect);
+        }
+
+        void renderSurfaceFillScreen(SDL_Surface* pSurface) {
+            SDL_BlitScaled(pSurface, NULL, screenSurface, NULL);
+        }
+
+        // -- Hardware Rendering --
+
+        void renderTexture(SDL_Texture* pTexture, SDL_Rect sourceMask, SDL_Rect destinationArea) {
+            SDL_RenderCopy(renderer, pTexture, &sourceMask, &destinationArea);
+        }
+
+        void renderTexture(SDL_Texture* pTexture, SDL_Rect destinationArea) {
+            SDL_RenderCopy(renderer, pTexture, NULL, &destinationArea);
+        }
+
+        void renderTextureFillScreen(SDL_Texture* pTexture) {
+            SDL_RenderCopy(renderer, pTexture, NULL, NULL);
+        }
+
+        // -- General --
+
+        void setTitle(std::string title) {
+            this->title = title;
+            SDL_SetWindowTitle(window, this->title.c_str());
+        }
+
         void presentRender() {
-            SDL_RenderPresent(renderer);
+            // render by renderer
+            if (renderMode == RenderMode::simpleRenderer || renderMode == RenderMode::hardwareRendering) {
+                SDL_RenderPresent(renderer);
+            // render by window surface
+            } else {
+                SDL_UpdateWindowSurface(window);
+            }
+
         }
 
     private:
+        RenderMode renderMode;
         SDL_Window* window = NULL;
+        SDL_Surface* screenSurface = NULL;
         SDL_Renderer* renderer = NULL;
         std::vector<SDL_Texture*> allocatedTextures;
         std::vector<SDL_Surface*> allocatedSurfaces;

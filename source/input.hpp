@@ -95,12 +95,12 @@ class Input {
                         case SDL_WINDOWEVENT_SIZE_CHANGED:
                             window.screenWidth = e.window.data1;
                             window.screenHeight = e.window.data2;
-                            SDL_RenderPresent(window.getRenderer());
+                            window.presentRender();
                             break;
 
                         //Repaint on exposure
                         case SDL_WINDOWEVENT_EXPOSED:
-                            SDL_RenderPresent(window.getRenderer());
+                            window.presentRender();
                             break;
 
                         //Mouse entered window
