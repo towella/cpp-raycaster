@@ -10,7 +10,7 @@
 int main(int argc, char* argv[]) {
     const int targetFps = 60;  // SDL auto caps at 60
     const int ticksPerFrame = 1000 / targetFps;  // a tick is a ms
-    Window window = Window(RenderMode::softwareRendering);
+    Window window = Window();
 
     Room firstRoom = Room(20, 20);
     Room* currentRoom = &firstRoom;

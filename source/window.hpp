@@ -37,8 +37,8 @@ enum RenderMode {
 
 class Window {
     public:
-        int screenWidth = 800;
-        int screenHeight = 600;
+        static inline const int screenWidth = 800;
+        static inline const int screenHeight = 600;
         std::string title = "";
 
 // MARK: -- SETUP AND SHUTDOWN -------------------------------------------------------
@@ -99,6 +99,7 @@ class Window {
                     std::cerr << "SDL_image could not initialize! SDL_image Error.\n";
                     failure = true;
                 }
+                screenTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, screenWidth, screenHeight);
             }
         }
 
@@ -186,6 +187,15 @@ class Window {
             SDL_RenderDrawLine(renderer, p1.x(), p1.y(), p2.x(), p2.y());
         }
 
+        void renderPoint(int x, int y, Colour& colour=Colours::white) {
+            SDL_SetRenderDrawColor(renderer, colour.r, colour.g, colour.b, colour.a);
+            SDL_RenderDrawPoint(renderer, x, y);
+        }
+
+        void renderPoint(const Point2D& p, Colour& colour=Colours::white) {
+            renderPoint(p.x(), p.y(), colour);
+        }
+
         // -- Software Rendering --
 
         void renderSurface(SDL_Surface* pSurface, Point2D topLeft) {
@@ -221,6 +231,19 @@ class Window {
 
         // -- Hardware Rendering --
 
+        void renderPixel(int x, int y, Colour colour) {
+            // if (x < screenWidth && y < screenHeight && x >= 0 && y >= 0) {
+            //     Uint32 pixelColour = 4294967290;
+            //     int pixelIndex = y * (screenWidth - 1) + x;
+            //     std::cout << pixelIndex << '\n';
+            //     (*pixels)[pixelIndex] = pixelColour;
+            // }
+        }
+
+        void renderPixel(Point2D pixel, Colour colour) {
+            renderPixel(pixel.x(), pixel.y(), colour);
+        }
+
         void renderTexture(SDL_Texture* pTexture, SDL_Rect sourceMask, SDL_Rect destinationArea) {
             SDL_RenderCopy(renderer, pTexture, &sourceMask, &destinationArea);
         }
@@ -243,6 +266,10 @@ class Window {
         void presentRender() {
             // render by renderer
             if (renderMode == RenderMode::simpleRenderer || renderMode == RenderMode::hardwareRendering) {
+                if (renderMode == RenderMode::hardwareRendering) {
+                    SDL_UpdateTexture(screenTexture, NULL, pixels, screenWidth * sizeof(Uint32));
+                    renderTextureFillScreen(screenTexture);
+                }
                 SDL_RenderPresent(renderer);
             // render by window surface
             } else {
@@ -254,8 +281,10 @@ class Window {
     private:
         RenderMode renderMode;
         SDL_Window* window = NULL;
-        SDL_Surface* screenSurface = NULL;
         SDL_Renderer* renderer = NULL;
-        std::vector<SDL_Texture*> allocatedTextures;
-        std::vector<SDL_Surface*> allocatedSurfaces;
+        SDL_Surface* screenSurface = NULL;
+        SDL_Texture * screenTexture = NULL;  // used for per pixel modification and rendering
+        Uint32 * pixels[screenHeight * screenWidth];  // pixel buffer that is then used to update texture
+        std::vector<SDL_Texture*> allocatedTextures = {screenTexture};  // vector of textures for deallocation on close
+        std::vector<SDL_Surface*> allocatedSurfaces = {screenSurface};  // vector of surface for deallocation on close
 };

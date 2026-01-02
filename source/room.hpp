@@ -312,6 +312,7 @@ class Room {
             Point2D lerpOffset = Point2D((playerCamera.second.x() - playerCamera.first.x()) * lerpIncrement,
                                          (playerCamera.second.y() - playerCamera.first.y()) * lerpIncrement);
 
+            // loop through screen slices
             for (int x = 0; x < window.screenWidth; x += w) {
                 double rayAngle = player.getAngleTo(cameraCastPoint);
                 Ray2D ray = Ray2D(player, rayAngle, maxDof, wallSize, map);
@@ -321,10 +322,13 @@ class Room {
                 // https://stackoverflow.com/questions/66591163/how-do-i-fix-the-warped-perspective-in-my-raycaster
                 double angleDifference = wrapRadAngle(player.getRotRad() - rayAngle);
                 rayLength *= cos(angleDifference);
+                if (rayLength < 1) {
+                    rayLength = 1;
+                }
 
-                h = wallSize * window.screenHeight / rayLength;
+                h = std::min(wallSize * window.screenHeight / rayLength, (double)window.screenHeight);
                 y = (window.screenHeight - h) / 2;
-                SDL_Rect slice = {x, y, w, h};
+
                 int value = (int) (255 * window.screenHeight / rayLength / wallSize);
                 // value adjustments and capping
                 value += 30;
@@ -333,8 +337,14 @@ class Room {
                 if (value < 0) { value = 0; }
                 Colour colour = {value, value, value, value};
 
+                // render ray slice a vertical pixel at a time
                 if (ray.getHit()) {
-                    window.renderRect(slice, colour);
+                    for (int yOffset = 0; yOffset < h; yOffset++) {
+                        SDL_Rect pixel = {x, y + yOffset, w, w};
+                        window.renderRect(pixel, colour);
+                        //Point2D pixel = {x, y + yOffset};
+                        //window.renderPixel(pixel, colour);
+                    }
                 }
                 
                 cameraCastPoint = cameraCastPoint + lerpOffset;  // move to next slice of camera plane

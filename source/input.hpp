@@ -92,11 +92,11 @@ class Input {
                 } else if (e.type == SDL_WINDOWEVENT) {
                     switch( e.window.event ) {
                         //Get new dimensions and repaint on window size change
-                        case SDL_WINDOWEVENT_SIZE_CHANGED:
-                            window.screenWidth = e.window.data1;
-                            window.screenHeight = e.window.data2;
-                            window.presentRender();
-                            break;
+                        // case SDL_WINDOWEVENT_SIZE_CHANGED:
+                        //     window.screenWidth = e.window.data1;
+                        //     window.screenHeight = e.window.data2;
+                        //     window.presentRender();
+                        //     break;
 
                         //Repaint on exposure
                         case SDL_WINDOWEVENT_EXPOSED:
