@@ -326,7 +326,7 @@ class Room {
                     rayLength = 1;
                 }
 
-                h = std::min(wallSize * window.screenHeight / rayLength, (double)window.screenHeight);
+                h = std::min(wallSize * window.screenHeight / rayLength, (double)window.screenHeight);  // cap height to screen height
                 y = (window.screenHeight - h) / 2;
 
                 int value = (int) (255 * window.screenHeight / rayLength / wallSize);
@@ -340,10 +340,8 @@ class Room {
                 // render ray slice a vertical pixel at a time
                 if (ray.getHit()) {
                     for (int yOffset = 0; yOffset < h; yOffset++) {
-                        SDL_Rect pixel = {x, y + yOffset, w, w};
-                        window.renderRect(pixel, colour);
-                        //Point2D pixel = {x, y + yOffset};
-                        //window.renderPixel(pixel, colour);
+                        Point2D pixel = {x, y + yOffset};
+                        window.renderPixel(pixel, colour);
                     }
                 }
                 

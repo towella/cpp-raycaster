@@ -7,11 +7,23 @@
 #include "../include/SDL2/SDL_image.h"
 #include "point.hpp"
 
-struct Colour {
-    int r = 255;
-    int g = 255;
-    int b = 255;
-    int a = 255;
+class Colour {
+    public:
+        int r = 255;
+        int g = 255;
+        int b = 255;
+        int a = 255;
+
+        Colour(int r, int g, int b, int a) {
+            this->r = r;
+            this->g = g;
+            this->b = b;
+            this->a = a;
+        }
+
+        Uint32 ARGB8888() {
+            return (Uint32)((a << 24) + (r << 16) + (g << 8) + b);
+        }
 };
 
 // can be accessed with Colours::colourName syntax
@@ -160,6 +172,9 @@ class Window {
 // MARK: -- RENDERING ----------------------------------------------------------------
 
         void clear() {
+            for (int i = 0; i < screenHeight * screenWidth; i++) {
+                pixels[i] = Colours::black.ARGB8888();
+            }
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
             SDL_RenderClear(renderer);
         }
@@ -231,18 +246,7 @@ class Window {
 
         // -- Hardware Rendering --
 
-        void renderPixel(int x, int y, Colour colour) {
-            // if (x < screenWidth && y < screenHeight && x >= 0 && y >= 0) {
-            //     Uint32 pixelColour = 4294967290;
-            //     int pixelIndex = y * (screenWidth - 1) + x;
-            //     std::cout << pixelIndex << '\n';
-            //     (*pixels)[pixelIndex] = pixelColour;
-            // }
-        }
-
-        void renderPixel(Point2D pixel, Colour colour) {
-            renderPixel(pixel.x(), pixel.y(), colour);
-        }
+        // - texture -
 
         void renderTexture(SDL_Texture* pTexture, SDL_Rect sourceMask, SDL_Rect destinationArea) {
             SDL_RenderCopy(renderer, pTexture, &sourceMask, &destinationArea);
@@ -254,6 +258,18 @@ class Window {
 
         void renderTextureFillScreen(SDL_Texture* pTexture) {
             SDL_RenderCopy(renderer, pTexture, NULL, NULL);
+        }
+
+        // - pixel buffer -
+
+        void renderPixel(int x, int y, Colour colour) {
+            if (x < screenWidth && y < screenHeight && x >= 0 && y >= 0) {
+                pixels[y * screenWidth + x] = colour.ARGB8888();
+            }
+        }
+
+        void renderPixel(Point2D pixel, Colour colour) {
+            renderPixel(pixel.x(), pixel.y(), colour);
         }
 
         // -- General --
@@ -284,7 +300,7 @@ class Window {
         SDL_Renderer* renderer = NULL;
         SDL_Surface* screenSurface = NULL;
         SDL_Texture * screenTexture = NULL;  // used for per pixel modification and rendering
-        Uint32 * pixels[screenHeight * screenWidth];  // pixel buffer that is then used to update texture
+        Uint32 pixels[screenHeight * screenWidth];  // pixel buffer that is then used to update texture
         std::vector<SDL_Texture*> allocatedTextures = {screenTexture};  // vector of textures for deallocation on close
         std::vector<SDL_Surface*> allocatedSurfaces = {screenSurface};  // vector of surface for deallocation on close
 };
